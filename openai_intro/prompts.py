@@ -100,7 +100,7 @@ completion = client.chat.completions.create(
     # temperature=0.5,  # controls the randomness of the output
     top_p=0.9,  # controls the diversity of the output
     # max_tokens=50,
-    stream=True,
+    stream=True, # If stream is true, then we need to use delta in choices[0].delta.content
 )
 # print(completion.choices[0].message.content)
 for chunk in completion:
