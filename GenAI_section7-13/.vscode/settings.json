@@ -1,0 +1,7 @@
+{
+  "python.defaultInterpreterPath": "/Users/alejandrocortes/Documents/Courses/Udemy\\ Courses/AI_and_LLMs/GenAI_section7-13/aiLLM/bin/python",
+  "code-runner.runInTerminal": true,
+  "code-runner.executorMap": {
+    "python": "\"/Users/alejandrocortes/Documents/Courses/Udemy\\ Courses/AI_and_LLMs/GenAI_section7-13/aiLLM/bin/python\" -u"
+  }
+}
