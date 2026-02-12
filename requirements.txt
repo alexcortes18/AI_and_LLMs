@@ -6,4 +6,5 @@ transformers
 ollama
 requests
 torch
+langchain_core
 # python -m pip install --upgrade pip
