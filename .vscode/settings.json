@@ -7,9 +7,9 @@
 // }
 
 {
-  "python.defaultInterpreterPath": "${workspaceFolder}/aiLLM/bin/python",
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
   "code-runner.runInTerminal": true,
   "code-runner.executorMap": {
-    "python": "\"${workspaceFolder}/aiLLM/bin/python\" -u"
+    "python": "\"${workspaceFolder}/.venv/bin/python\" -u"
   }
 }
