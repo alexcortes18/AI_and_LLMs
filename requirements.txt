@@ -7,4 +7,5 @@ ollama
 requests
 torch
 langchain_core
+langchain_community
 # python -m pip install --upgrade pip
