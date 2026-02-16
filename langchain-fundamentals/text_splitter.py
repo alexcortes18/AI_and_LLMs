@@ -13,4 +13,3 @@ text_splitter = RecursiveCharacterTextSplitter(
 splits = text_splitter.split_documents(documents=documents)
 for i, split in enumerate(splits):
     print(f"Split {i+1}:\n{split}\n")
-print(type(splits[0]))
