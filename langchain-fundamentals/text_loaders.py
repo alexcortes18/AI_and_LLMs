@@ -110,6 +110,29 @@ embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
 vectorstore = FAISS.from_documents(chunk_docs, embeddings)
 retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
 
-query = "What did Martin Luther King Jr. dream about?"
+# query = "What did Martin Luther King Jr. dream about?"
+query = "Give me a summary of the speech in bullet points"
 results = retriever.invoke(query)
-print(results)
+pprint.pprint(results)
+print("\n")
+
+# Chat with model and our docs
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+
+prompt = ChatPromptTemplate.from_template(
+    "Please use the following {docs} and answer the following question: {query}"
+)
+model = ChatOpenAI(model="gpt-4o-mini")
+chain = prompt | model | StrOutputParser()
+
+# Before sending the retrieve docs (results), we can format them to just send the page_content from them, and not the metadata
+context = "\n\n".join(d.page_content for d in results)
+
+print("Context sent to model:\n")
+print(context)
+print(f"\nChars:  {len(context)} \n")
+
+response = chain.invoke({"docs": context, "query": query})
+print(response)
