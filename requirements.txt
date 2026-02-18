@@ -10,4 +10,5 @@ langchain_core
 langchain_community
 faiss-cpu
 unstructured
+tavily-python
 # python -m pip install --upgrade pip
