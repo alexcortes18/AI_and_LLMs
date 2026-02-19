@@ -34,19 +34,27 @@ def bot(state: State):
 
 graph_builder = StateGraph(State)
 graph_builder.add_node("bot", bot)
-graph_builder.add_node("tools", ToolNode(tools=tools)) # When a tool call appears, this node actually runs the tool and returns ToolMessage.
+graph_builder.add_node("tools", ToolNode(tools=tools))   # if rounting or control flow arrives here, then this node executes requested tool_calls and returns ToolMessage(s).
 graph_builder.set_entry_point("bot")
+
+# "tools_condition" checks the last AI message from "bot":
+# - if tool_calls exist -> route to "tools"
+# - else -> route to "__end__"
+# If tools_condition sees tool_calls, that means the LLM already decided to use a tool
+# and is influenced by tool schemas (bind_tools), prompts/instructions, and model settings.
 graph_builder.add_conditional_edges("bot", tools_condition)
 graph_builder.add_edge("tools", "bot")
 graph = graph_builder.compile()
-
 
 while True:
     user_input = input("User: ")
     if user_input.lower() in ["quit", "exit", "q"]:
         print("Goodbye!")
         break
-    for event in graph.stream({"messages": [("user", user_input)]}):
+    
+    # Important flow/routing block:
+    # Streams one graph run from an initial user message in state, yielding node-by-node events.
+    for event in graph.stream({"messages": [("user", user_input)]}): # user_input enters state, then entry node ("bot") runs
         for value in event.values():
             if isinstance(value["messages"][-1], BaseMessage):
                 pprint.pprint(f"Assistant: {value['messages'][-1].content}")
