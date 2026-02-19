@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.messages import BaseMessage
 from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -44,7 +45,9 @@ graph_builder.set_entry_point("bot")
 # and is influenced by tool schemas (bind_tools), prompts/instructions, and model settings.
 graph_builder.add_conditional_edges("bot", tools_condition)
 graph_builder.add_edge("tools", "bot")
-graph = graph_builder.compile()
+memory = InMemorySaver()
+graph = graph_builder.compile(checkpointer=memory)
+config = {"configurable": {"thread_id": "1"}}
 
 while True:
     user_input = input("User: ")
@@ -54,7 +57,10 @@ while True:
     
     # Important flow/routing block:
     # Streams one graph run from an initial user message in state, yielding node-by-node events.
-    for event in graph.stream({"messages": [("user", user_input)]}): # user_input enters state, then entry node ("bot") runs
+    for event in graph.stream(
+        {"messages": [("user", user_input)]},
+        config=config,
+    ): # user_input enters state, then entry node ("bot") runs
         for value in event.values():
             if isinstance(value["messages"][-1], BaseMessage):
                 pprint.pprint(f"Assistant: {value['messages'][-1].content}")

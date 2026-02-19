@@ -99,17 +99,45 @@ graph_builder.add_conditional_edges(
 
 graph_builder.add_node("bot", bot)
 graph_builder.set_entry_point("bot")
+
+# Add MEMORY NODE -> to add memory to our Agent State
+# from langgraph.checkpoint.sqlite import SqliteSaver #Before use this one
+from langgraph.checkpoint.memory import InMemorySaver
+memory = InMemorySaver()
+
 # graph_builder.set_finish_point("bot") # Not needed anymore, because the tools should know how to end
-graph = graph_builder.compile()
+graph = graph_builder.compile(checkpointer= memory)
 
-from langchain_core.messages import BaseMessage
+config = {
+    "configurable" : {"thread_id":1}
+}
+#testing the memory:
+user_input = "Hi there! My name is Bond"
 
-while True:
-    user_input = input("User: ")
-    if user_input.lower() in ["quit", "exit", "q"]:
-        print("Goodbye!")
-        break
-    for event in graph.stream({"messages": [("user", user_input)]}):
-        for value in event.values():
-            if isinstance(value["messages"][-1], BaseMessage):
-                pprint.pprint(f"Assistant: {value['messages'][-1].content}")
+# The config is the **second positional argument** to stream()
+events = graph.stream(
+    {"messages": [("user", user_input)]}, config= config, stream_mode= "values"
+)
+for event in events:
+    event["messages"][-1].pretty_print()
+    
+user_input = "What is my name?"
+events = graph.stream(
+    {"messages": [("user", user_input)]}, config= config, stream_mode= "values"
+)
+for event in events:
+    event["messages"][-1].pretty_print()
+    
+snapshot = graph.get_state(config)
+print(json.dumps(snapshot, indent=2,default=str))
+
+# from langchain_core.messages import BaseMessage
+# while True:
+#     user_input = input("User: ")
+#     if user_input.lower() in ["quit", "exit", "q"]:
+#         print("Goodbye!")
+#         break
+#     for event in graph.stream({"messages": [("user", user_input)]}):
+#         for value in event.values():
+#             if isinstance(value["messages"][-1], BaseMessage):
+#                 pprint.pprint(f"Assistant: {value['messages'][-1].content}")
