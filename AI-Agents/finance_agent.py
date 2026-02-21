@@ -2,6 +2,7 @@ import os
 import json
 import operator
 from io import StringIO
+import pprint
 import pandas as pd
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -108,9 +109,109 @@ def compare_performance_node(state: AgentState):
         "revision_number": state.get("revision_number", 1) + 1,
     }
 
+def research_critique_node(state: AgentState):
+    queries = model.with_structured_output(Queries).invoke(
+        [
+            SystemMessage(content=RESEARCH_CRITIQUE_PROMPT),
+            HumanMessage(content=state["feedback"]),
+        ]
+    )
+    content = state["content"] or []
+    for q in queries.queries:
+        response = tavily.search(query=q, max_results=2)
+        for r in response["results"]:
+            content.append(r["content"])
+    return {"content": content}
+
+def collect_feedback_node(state: AgentState):
+    messages = [
+        SystemMessage(content=FEEDBACK_PROMPT),
+        HumanMessage(content=state["comparison"]),
+    ]
+    response = model.invoke(messages)
+    return {"feedback": response.content}
+
+def write_report_node(state: AgentState):
+    messages = [
+        SystemMessage(content=WRITE_REPORT_PROMPT),
+        HumanMessage(content=state["comparison"]),
+    ]
+    response = model.invoke(messages)
+    return {"report": response.content}
 
 
+def should_continue(state):
+    if state["revision_number"] > state["max_revisions"]:
+        return END
+    return "collect_feedback"
 
 
-# builder = StateGraph(AgentState)
-# builder.add_node("gather_financials", gather_financials_node)
+builder = StateGraph(AgentState)
+builder.add_node("gather_financials", gather_financials_node)
+builder.add_node("analyze_data", analyze_data_node)
+builder.add_node("research_competitors", research_competitors_node)
+builder.add_node("compare_performance", compare_performance_node)
+builder.add_node("collect_feedback", collect_feedback_node)
+builder.add_node("research_critique", research_critique_node)
+builder.add_node("write_report", write_report_node)
+
+builder.set_entry_point("gather_financials")
+
+builder.add_conditional_edges(
+    "compare_performance", # source node name
+    should_continue, #router function -> either END or go to x node.
+    {END:END, "collect_feedback": "collect_feedback"}
+)
+
+builder.add_edge("gather_financials", "analyze_data")
+builder.add_edge("analyze_data", "research_competitors")
+builder.add_edge("research_competitors", "compare_performance")
+builder.add_edge("collect_feedback", "research_critique")
+builder.add_edge("research_critique", "compare_performance")
+builder.add_edge("compare_performance", "write_report")
+
+graph = builder.compile(checkpointer=memory)
+# graph = builder.compile()
+
+# ==== For Console Testing ====
+def read_csv_file(file_path):
+    with open(file_path, "r") as file:
+        print("Reading CSV file...")
+        return file.read()
+
+
+if __name__ == "__main__":
+    task = "Analyze the financial performance of our (MegaAICo) company compared to competitors"
+    competitors = ["Microsoft", "Nvidia", "Google"]
+    csv_file_path = "AI-Agents/data/financials.csv"
+
+    if not os.path.exists(csv_file_path):
+        print(f"CSV file not found at {csv_file_path}")
+    else:
+        print("Starting the conversation...")
+        csv_data = read_csv_file(csv_file_path)
+
+        initial_state = {
+            "task": task,
+            "competitors": competitors,
+            "csv_file": csv_data,
+            "max_revisions": 2,
+            "revision_number": 1,
+            # Add these initialized keys
+            "content": [],
+            "financial_data": "",
+            "analysis": "",
+            "competitor_data": "",
+            "comparison": "",
+            "feedback": "",
+            "report": ""
+        }
+
+        for s in graph.stream(
+            initial_state, config = {
+            "configurable": {"thread_id": 1}
+            },
+            stream_mode= "values"
+            ):
+            pprint.pprint(s)
+# === End Console Testing ===
