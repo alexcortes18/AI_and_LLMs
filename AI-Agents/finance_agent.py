@@ -14,6 +14,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from pydantic import BaseModel
 from langgraph.checkpoint.memory import InMemorySaver
 from tavily import TavilyClient
+import streamlit
 
 memory = InMemorySaver()
 load_dotenv()
@@ -179,23 +180,70 @@ def read_csv_file(file_path):
         print("Reading CSV file...")
         return file.read()
 
+# ==================================== Console Testing ====================================
+# if __name__ == "__main__":
+#     task = "Analyze the financial performance of our (MegaAICo) company compared to competitors"
+#     competitors = ["Microsoft", "Nvidia", "Google"]
+#     csv_file_path = "AI-Agents/data/financials.csv"
 
-if __name__ == "__main__":
-    task = "Analyze the financial performance of our (MegaAICo) company compared to competitors"
-    competitors = ["Microsoft", "Nvidia", "Google"]
-    csv_file_path = "AI-Agents/data/financials.csv"
+#     if not os.path.exists(csv_file_path):
+#         print(f"CSV file not found at {csv_file_path}")
+#     else:
+#         print("Starting the conversation...")
+#         csv_data = read_csv_file(csv_file_path)
 
-    if not os.path.exists(csv_file_path):
-        print(f"CSV file not found at {csv_file_path}")
-    else:
-        print("Starting the conversation...")
-        csv_data = read_csv_file(csv_file_path)
+#         initial_state = {
+#             "task": task,
+#             "competitors": competitors,
+#             "csv_file": csv_data,
+#             "max_revisions": 2,
+#             "revision_number": 1,
+#             # Add these initialized keys
+#             "content": [],
+#             "financial_data": "",
+#             "analysis": "",
+#             "competitor_data": "",
+#             "comparison": "",
+#             "feedback": "",
+#             "report": ""
+#         }
 
+#         for s in graph.stream(
+#             initial_state, config = {
+#             "configurable": {"thread_id": 1}
+#             },
+#             stream_mode= "values"
+#             ):
+#             pprint.pprint(s)
+# ==================================== End Console Testing ====================================
+
+# ==== Streamlit UI ====
+import streamlit as st
+
+
+def main():
+    st.title("Financial Performance Reporting Agent")
+
+    task = st.text_input(
+        "Enter the task:",
+        "Analyze the financial performance of our company (MyAICo.AI) compared to competitors",
+    )
+    competitors = st.text_area("Enter competitor names (one per line):").split("\n")
+    max_revisions = st.number_input("Max Revisions", min_value=1, value=2)
+    uploaded_file = st.file_uploader(
+        "Upload a CSV file with the company's financial data", type=["csv"]
+    )
+
+    if st.button("Start Analysis") and uploaded_file is not None:
+        # Read the uploaded CSV file
+        csv_data = uploaded_file.getvalue().decode("utf-8")
+
+        # Initialize state with all required keys
         initial_state = {
             "task": task,
-            "competitors": competitors,
+            "competitors": [comp.strip() for comp in competitors if comp.strip()],
             "csv_file": csv_data,
-            "max_revisions": 2,
+            "max_revisions": max_revisions,
             "revision_number": 1,
             # Add these initialized keys
             "content": [],
@@ -204,14 +252,30 @@ if __name__ == "__main__":
             "competitor_data": "",
             "comparison": "",
             "feedback": "",
-            "report": ""
+            "report": "",
         }
 
-        for s in graph.stream(
-            initial_state, config = {
-            "configurable": {"thread_id": 1}
-            },
-            stream_mode= "values"
-            ):
-            pprint.pprint(s)
-# === End Console Testing ===
+        state_placeholder = st.empty()
+
+        thread = {"configurable": {"thread_id": "1"}}
+
+        try:
+            final_state = None
+            for s in graph.stream(initial_state,config = thread, stream_mode="values"):
+                with state_placeholder.container():
+                    st.write("Current State:", s)
+                final_state = s
+            print(f" What did it find: {final_state['report']}")
+            if final_state and "report" in final_state:
+                st.subheader("Final Report")
+                st.markdown(final_state["report"])
+                print(f" Entered: {final_state['report']}")
+
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
+
+
+if __name__ == "__main__":
+    main()
+
+# ==== End Streamlit UI ====
