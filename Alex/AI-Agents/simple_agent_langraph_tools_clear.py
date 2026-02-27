@@ -27,7 +27,6 @@ tool = TavilySearchResults(max_results=2)
 tools = [tool]
 model_with_tools = model.bind_tools(tools) # -> “These tools exist; here are their names and arg schemas.”
 
-
 def bot(state: State):
     print(state["messages"])
     return {"messages": [model_with_tools.invoke(state["messages"])]}
