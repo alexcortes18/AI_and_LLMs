@@ -9,6 +9,8 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
 
+# READ ABOUT CHAINS AT THE END!
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -96,12 +98,14 @@ def setup_qa_chain(db):
         """
     )
     
-    # Create the chain
+    # Create the chain. The chain is a RunnableSequence and it can be ".invoke()"
     chain = (
-        {"context": retriever, "question": RunnablePassthrough()}
-        | prompt
-        | llm
-        | StrOutputParser()
+        {"context": retriever, "question": RunnablePassthrough()} # these both parts of the dict receive the input of the chain when
+        # the chain is invoked: chain.invoke(query). Query is passed through {"context": retriever.invoke(query), "question": query}
+        # and that new dict is returned.
+        | prompt # the new prompt is a type 'PromptValue' with this new variables inside its text = {"context": retriever.invoke(query), "question": query}
+        | llm # the prompt goes into the llm (ChatOpenAI runnable) and output is an AIMessage.
+        | StrOutputParser() # the model's output (AIMessage) is extracted as a string.
     )
 
     return chain, retriever  # Return both chain and retriever
@@ -166,3 +170,32 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
+    
+# RUNNABLE / CHAIN NOTES:
+"""
+Any object that implements LangChain's Runnable interface supports .invoke().
+
+Common runnable objects:
+- RunnableSequence: a | b | c
+- RunnableParallel (dict runnables): {"x": a, "y": b}
+- RunnablePassthrough / RunnableLambda
+- ChatPromptTemplate
+- Chat/LLM models (e.g., ChatOpenAI)
+- Retrievers (e.g., VectorStoreRetriever)
+- Output parsers (e.g., StrOutputParser)
+- Many LCEL-based chains and tool wrappers
+
+LCEL (LangChain Expression Language) is the pipe syntax used to compose steps:
+chain = prompt | llm | StrOutputParser()
+
+Why this is a chain:
+- Each step is runnable-compatible.
+- The | operator composes them into a RunnableSequence.
+- The output of one step becomes the input to the next step.
+
+Note:
+- A chain can be invoked with a normal string input.
+- But chain *steps* cannot be raw strings; they must be runnables (or runnable-coercible objects).
+In this code, the dict runnable has runnable values in its key-value pairs.
+"""
