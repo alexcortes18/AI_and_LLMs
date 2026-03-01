@@ -24,3 +24,4 @@ unstructured
 selenium
 newspaper3k
 lxml-html-clean
+langchain-ollama
