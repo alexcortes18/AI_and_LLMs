@@ -8,6 +8,7 @@ langchain-text-splitters
 langgraph
 ollama
 openai
+notion-client
 pandas
 pydantic
 PyPDF2
@@ -21,3 +22,5 @@ torch
 transformers
 unstructured
 selenium
+newspaper3k
+lxml-html-clean
