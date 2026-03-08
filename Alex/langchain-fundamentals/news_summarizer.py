@@ -87,4 +87,50 @@ class NewsArticleSummarizer:
         # Create documents
         docs = self.create_documents(article.text)
         
-        ################### NOT FINISHED the summarize() yet ###################
+        # Define prompts based on summary type
+        if summary_type == "detailed":
+            map_prompt_template = """Write a detailed summary of the following text:
+            "{text}"
+            DETAILED SUMMARY:"""
+
+            combine_prompt_template = """Write a detailed summary of the following text that combines the previous summaries:
+            "{text}"
+            FINAL DETAILED SUMMARY:"""
+        else:  # concise summary
+            map_prompt_template = """Write a concise summary of the following text:
+            "{text}"
+            CONCISE SUMMARY:"""
+
+            combine_prompt_template = """Write a concise summary of the following text that combines the previous summaries:
+            "{text}"
+            FINAL CONCISE SUMMARY:"""
+
+        # Create prompts
+        map_prompt = PromptTemplate(
+            template=map_prompt_template, input_variables=["text"]
+        )
+
+        combine_prompt = PromptTemplate(
+            template=combine_prompt_template, input_variables=["text"]
+        )
+
+        # Create and run chain
+        chain = load_summarize_chain(
+            llm=self.llm,
+            chain_type="map_reduce",
+            map_prompt=map_prompt,
+            combine_prompt=combine_prompt,
+            verbose=True,
+        )
+
+        # Generate summary
+        summary = chain.invoke(docs)
+
+        return {
+            "title": article.title,
+            "authors": article.authors,
+            "publish_date": article.publish_date,
+            "summary": summary,
+            "url": url,
+            "model_info": {"type": self.model_type, "name": self.model_name},
+        }
