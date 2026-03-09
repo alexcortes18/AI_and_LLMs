@@ -200,11 +200,6 @@ class YoutubeVideoSummarizer:
             return None
 
 def main():
-    # use these urls for testing
-    urls = [
-        "https://www.youtube.com/watch?v=v48gJFQvE1Y&ab_channel=BrockMesarich%7CAIforNonTechies",
-        "https://www.youtube.com/watch?v=XwZkNaTYBQI&ab_channel=TheGadgetGameShow%3AWhatTheHeckIsThat%3F%21",
-    ]
     # Get model preferences
     print("\nAvailable LLM Models:")
     print("1. OpenAI GPT-4")
