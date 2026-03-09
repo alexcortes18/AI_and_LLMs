@@ -86,28 +86,49 @@ class DocumentProcessor:
 class VoiceGenerator:
     def __init__(self, api_key):
         self.client = ElevenLabs(api_key=api_key)
-        # Default available voices
-        self.available_voices = [
-            "Rachel",
-            "Domi",
-            "Bella",
-            "Antoni",
-            "Elli",
-            "Josh",
-            "Arnold",
-            "Adam",
-            "Sam",
-        ]
-        self.default_voice = "Rachel"
+        self.voice_name_to_id = {}
+        self.last_error = None
+
+        # Known fallback voice IDs in case voice listing fails
+        self.fallback_voice_name_to_id = {
+            "Rachel": "21m00Tcm4TlvDq8ikWAM",
+        }
+
+        # Load available voices from ElevenLabs and map name -> voice_id
+        try:
+            voices_response = self.client.voices.get_all()
+            voices = getattr(voices_response, "voices", []) or []
+            self.voice_name_to_id = {
+                voice.name: voice.voice_id
+                for voice in voices
+                if getattr(voice, "name", None) and getattr(voice, "voice_id", None)
+            }
+            if not self.voice_name_to_id:
+                self.voice_name_to_id = self.fallback_voice_name_to_id.copy()
+            self.available_voices = sorted(self.voice_name_to_id.keys())
+        except Exception as e:
+            self.last_error = f"Failed to load voices: {e}"
+            self.voice_name_to_id = self.fallback_voice_name_to_id.copy()
+            self.available_voices = sorted(self.voice_name_to_id.keys())
+
+        if "Rachel" in self.voice_name_to_id:
+            self.default_voice = "Rachel"
+        elif self.available_voices:
+            self.default_voice = self.available_voices[0]
+        else:
+            self.default_voice = "Rachel"
 
     def generate_voice_response(self, text: str, voice_name: str = None) -> str:
         """Generate voice response"""
         try:
-            selected_voice = voice_name or self.default_voice
+            selected_voice_name = voice_name or self.default_voice
+            voice_id = self.voice_name_to_id.get(selected_voice_name, selected_voice_name)
 
-            # Generate audio using the client
-            audio_generator = self.client.generate(
-                text=text, voice=selected_voice, model="eleven_multilingual_v2"
+            # Generate audio using the ElevenLabs text-to-speech client
+            audio_generator = self.client.text_to_speech.convert(
+                voice_id=voice_id,
+                text=text,
+                model_id="eleven_multilingual_v2",
             )
 
             # Convert generator to bytes
@@ -119,9 +140,10 @@ class VoiceGenerator:
                 return temp_audio.name
 
         except Exception as e:
+            self.last_error = str(e)
             print(f"Error generating voice response: {e}")
             return None
-        
+
 class VoiceAssistantRAG:
     def __init__(self, elevenlabs_api_key):
         self.whisper_model = whisper.load_model("base")
@@ -222,7 +244,7 @@ def main():
     st.set_page_config(page_title="Voice RAG Assistant", layout="wide")
 
     # Check for API keys
-    elevenlabs_api_key = os.getenv("ELEVEN_LABS_API_KEY")
+    elevenlabs_api_key = os.getenv("ELEVEN_LABS_API_KEY") or os.getenv("ELEVENLABS_API_KEY")
     openai_api_key = os.getenv("OPENAI_API_KEY")
 
     if not all([elevenlabs_api_key, openai_api_key]):
@@ -312,7 +334,11 @@ def main():
                         st.audio(audio_file)
                         os.unlink(audio_file)
                     else:
-                        st.error("Failed to generate voice response")
+                        err = assistant.voice_generator.last_error
+                        if err:
+                            st.error(f"Failed to generate voice response: {err}")
+                        else:
+                            st.error("Failed to generate voice response")
 
         # Display chat history
         if "chat_history" in st.session_state:
