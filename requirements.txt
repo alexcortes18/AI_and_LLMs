@@ -28,3 +28,6 @@ langchain-ollama
 yt_dlp
 git+https://github.com/openai/whisper.git
 #brew install ffmpeg
+soundfile
+sounddevice
+elevenlabs
