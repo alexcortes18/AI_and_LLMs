@@ -31,3 +31,4 @@ git+https://github.com/openai/whisper.git
 soundfile
 sounddevice
 elevenlabs
+langchain_chroma

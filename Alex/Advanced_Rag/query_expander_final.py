@@ -2,13 +2,14 @@ import os
 from typing import List, Dict, Tuple, Any
 from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_core.documents import Document
 
-from langchain.prompts import PromptTemplate
+from langchain_classic.prompts import PromptTemplate
 from langchain_chroma import Chroma  # Updated import
 from chromadb.config import Settings
+from chromadb.api.shared_system_client import SharedSystemClient
 import shutil
 import streamlit as st  # Optional for visualization
 
@@ -31,6 +32,9 @@ class ChromaDBManager:
     def create_or_load_db(self, collection_name: str = "document_collection") -> Chroma:
         """Creates a new ChromaDB instance or loads existing one."""
         try:
+            # Drop any cached Chroma client tied to this persist path before reopening it.
+            SharedSystemClient.clear_system_cache()
+
             # Initialize Chroma with new package
             vector_store = Chroma(
                 collection_name=collection_name,
@@ -58,10 +62,13 @@ class ChromaDBManager:
     def reset_database(self):
         """Resets the database by removing all data."""
         try:
+            # Clear Chroma's shared client cache so deleted DB files are not reused.
+            SharedSystemClient.clear_system_cache()
+
             if os.path.exists(self.persist_directory): #if directory path exists
                 shutil.rmtree(self.persist_directory) #delete the folder and everything inside it
-                os.makedirs(self.persist_directory, exist_ok=True) #recreate the folder (to "reset" it basically)
-                print(f"Reset database at {self.persist_directory}")
+            os.makedirs(self.persist_directory, exist_ok=True) #recreate the folder (to "reset" it basically)
+            print(f"Reset database at {self.persist_directory}")
         except Exception as e:
             print(f"Error resetting database: {e}")
             
@@ -328,3 +335,229 @@ class AnswerGenerator:
                 "citations": {},
                 "formatted_context": "",
             }
+
+def main():
+    st.set_page_config(page_title="RAG Query Expansion", layout="wide")
+
+    st.title("RAG System with Query Expansion")
+
+    # Initialize paths with absolute paths
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    pdf_directory = os.path.join(current_dir, "data")
+    persist_directory = os.path.join(current_dir, "chromadb")
+
+    # Create directories if they don't exist
+    os.makedirs(pdf_directory, exist_ok=True)
+    os.makedirs(persist_directory, exist_ok=True)
+
+    # Display directory information
+    st.sidebar.title("System Information")
+    st.sidebar.info(f"PDF Directory: {pdf_directory}")
+    st.sidebar.info(f"Database Directory: {persist_directory}")
+
+    collection_name = "pdf_collection"
+
+    # Sidebar controls
+    st.sidebar.title("Controls")
+
+    # File uploader for PDFs
+    uploaded_files = st.sidebar.file_uploader(
+        "Upload PDF files", type="pdf", accept_multiple_files=True
+    )
+
+    if uploaded_files:
+        st.sidebar.success(f"Uploaded {len(uploaded_files)} files")
+        # Save uploaded files to pdf_directory
+        for uploaded_file in uploaded_files:
+            with open(os.path.join(pdf_directory, uploaded_file.name), "wb") as f:
+                f.write(uploaded_file.getvalue())
+
+    # Database reset button
+    if st.sidebar.button("Reset Database"):
+        if "db_manager" in st.session_state:
+            st.session_state.db_manager.reset_database()
+            st.sidebar.success("Database reset successfully!")
+            # Clear session state
+            for key in ["db_manager", "vector_store", "last_results"]:
+                if key in st.session_state:
+                    del st.session_state[key]
+
+    # Initialize system components when button is clicked
+    if st.sidebar.button("Initialize System"):
+        with st.spinner("Initializing system..."):
+            try:
+                # Create DB Manager
+                db_manager = ChromaDBManager(persist_directory)
+                st.session_state["db_manager"] = db_manager
+
+                # Create or load vector store
+                vector_store = db_manager.create_or_load_db(collection_name)
+
+                if vector_store:
+                    st.session_state["vector_store"] = vector_store
+                    st.sidebar.success("System initialized!")
+                else:
+                    st.sidebar.error("Failed to initialize vector store")
+            except Exception as e:
+                st.sidebar.error(f"Error initializing system: {str(e)}")
+
+    # Process documents when button is clicked
+    if st.sidebar.button("Process Documents"):
+        if "vector_store" not in st.session_state:
+            st.sidebar.error("Please initialize the system first")
+        else:
+            with st.spinner("Processing documents..."):
+                doc_processor = DocumentProcessor()
+                documents = doc_processor.load_pdfs(pdf_directory)
+
+                if documents:
+                    splits = doc_processor.split_documents(documents)
+                    success = doc_processor.process_and_store(
+                        splits, st.session_state.vector_store
+                    )
+                    if success:
+                        st.sidebar.success("Documents processed successfully!")
+                    else:
+                        st.sidebar.error("Failed to process documents")
+                else:
+                    st.sidebar.error("No documents found")
+
+    # Main query interface
+    st.header("Query Interface")
+
+    # Text input for query
+    query = st.text_input("Enter your question:")
+
+    # Number of results slider
+    k = st.slider("Number of results to return", min_value=1, max_value=10, value=3)
+
+    ## What are the key findings presented?
+    # Search button
+    # Search button
+    if st.button("Search"):
+        if query and "vector_store" in st.session_state:
+            with st.spinner("Processing query..."):
+                try:
+                    # Initialize query expander and answer generator
+                    query_expander = QueryExpander()
+                    answer_generator = AnswerGenerator()
+
+                    # Expand query
+                    expanded_queries = query_expander.expand_query(query)
+
+                    # Display expanded queries
+                    with st.expander("🔍 View Expanded Queries"):
+                        for i, exp_query in enumerate(expanded_queries, 1):
+                            st.write(f"{i}. {exp_query}")
+
+                    # Search with each expanded query
+                    all_results = {}
+                    for exp_query in expanded_queries:
+                        results = st.session_state.vector_store.similarity_search(
+                            exp_query, k=k
+                        )
+                        all_results[exp_query] = results
+
+                    # Generate final answer with citations
+                    st.subheader("📝 Detailed Analysis")
+                    with st.spinner("Generating comprehensive answer..."):
+                        response_data = answer_generator.generate_answer(
+                            query, all_results
+                        )
+
+                        # Display the answer
+                        st.markdown(response_data["answer"])
+
+                        # Display citations
+                        st.subheader("📚 Source Citations")
+                        for citation_id, citation_data in response_data[
+                            "citations"
+                        ].items():
+                            with st.expander(f"{citation_id} - Click to view source"):
+                                st.markdown("**Excerpt:**")
+                                st.markdown(f"```\n{citation_data['content']}\n```")
+                                st.markdown("**Original Query:**")
+                                st.markdown(f"*{citation_data['query']}*")
+
+                                # Option to view full content
+                                if st.button(f"View Full Content for {citation_id}"):
+                                    st.markdown("**Full Content:**")
+                                    st.markdown(
+                                        f"```\n{citation_data['full_content']}\n```"
+                                    )
+
+                    # Option to view all search results
+                    with st.expander("🔎 View All Search Results"):
+                        for query_text, docs in all_results.items():
+                            st.markdown(f"**Query:** {query_text}")
+                            for i, doc in enumerate(docs, 1):
+                                st.markdown(f"*Document {i}:*")
+                                st.markdown(f"```\n{doc.page_content[:500]}...\n```")
+                                st.markdown("---")
+
+                    # Generate final synthesized answer
+                    st.subheader("🎯 Final Answer")
+                    with st.spinner("Synthesizing final answer..."):
+                        final_prompt = PromptTemplate(
+                            input_variables=["question", "detailed_answer"],
+                            template="""Based on the detailed analysis provided, generate a clear, 
+                            concise final answer to the original question. Focus on the most important 
+                            points while maintaining accuracy.
+
+                            Original Question: {question}
+
+                            Detailed Analysis:
+                            {detailed_answer}
+
+                            Please provide a final answer that:
+                            1. Directly addresses the question
+                            2. Summarizes the key points
+                            3. Is clear and concise
+                            4. Maintains the crucial citations
+
+                            Final Answer:""",
+                        )
+
+                        final_response = ChatOpenAI(temperature=0).invoke(
+                            final_prompt.format(
+                                question=query, detailed_answer=response_data["answer"]
+                            )
+                        )
+
+                        # Display final answer in a highlighted box
+                        st.markdown("---")
+                        st.markdown("### 💡 Summary")
+                        st.markdown(
+                            f"""
+                            <div style='background-color: #f0f2f6; padding: 20px; border-radius: 10px;'>
+                            {final_response.content}
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+
+                except Exception as e:
+                    st.error(f"Error during search: {str(e)}")
+                    st.error("Full error:", exception=e)
+        else:
+            if "vector_store" not in st.session_state:
+                st.error("Please initialize the system first")
+            if not query:
+                st.error("Please enter a query")
+
+    # Display system status
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("System Status")
+    if "vector_store" in st.session_state:
+        st.sidebar.success("System is initialized")
+        try:
+            doc_count = len(st.session_state.vector_store.get()["ids"])
+            st.sidebar.info(f"Documents in database: {doc_count}")
+        except:
+            st.sidebar.info("Database is empty")
+    else:
+        st.sidebar.warning("System not initialized")
+
+
+if __name__ == "__main__":
+    main()
