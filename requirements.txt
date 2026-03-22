@@ -53,6 +53,7 @@ sentence-transformers==5.3.0
 # transformers: Hugging Face model stack, mentioned by the tutorial as required support tooling
 # sentence-transformers: embedding/cross-encoder utilities commonly paired with reranking workflows
 cohere==5.20.7
+pip install "unstructured[pdf]"
 
 # Fine-tuning / LoRA lessons
 # These are imported by the later lessons but are not installed in the current .venv yet.
@@ -64,3 +65,4 @@ fastapi
 uvicorn==0.41.0
 psutil==7.2.2
 prettytable
+=

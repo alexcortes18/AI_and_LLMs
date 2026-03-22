@@ -218,3 +218,89 @@ class RAGSystem:
                 "reranked_results": [],
                 "context": "",
             }
+            
+def display_results(result):
+    if not result["reranked_results"]:
+        st.warning("No results found.")
+        return
+
+    # Display answer
+    if result["answer"]:
+        st.markdown("### 💡 Answer")
+        st.markdown(
+            f"""<div style='background-color: #f0f2f6; padding: 20px; 
+            border-radius: 10px;'>{result['answer']}</div>""",
+            unsafe_allow_html=True,
+        )
+
+    # Display reranking stats
+    st.markdown("### 📊 Reranking Statistics")
+
+    scores = [doc["relevance_score"] for doc in result["reranked_results"]]
+    if scores:
+        cols = st.columns(3)
+        with cols[0]:
+            st.metric("Average Score", f"{sum(scores)/len(scores):.3f}")
+        with cols[1]:
+            st.metric("Max Score", f"{max(scores):.3f}")
+        with cols[2]:
+            st.metric("Min Score", f"{min(scores):.3f}")
+
+    # Display sources
+    st.markdown("### 📚 Reranked Sources")
+
+    for i, doc in enumerate(result["reranked_results"], 1):
+        score = doc["relevance_score"]
+        confidence = (
+            "High Relevance 🟢"
+            if score >= 0.7
+            else "Medium Relevance 🟡" if score >= 0.4 else "Low Relevance 🔴"
+        )
+
+        with st.expander(f"Document {i} - {confidence} (Score: {score:.3f})"):
+            st.markdown(
+                f"""
+            **Relevance Score:** {score:.3f}
+            
+            **Content:**
+            ```
+            {doc['document'].page_content}
+            ```
+            """
+            )
+            
+def main():
+
+    # Question to ask: what was the operating income in in 2023?
+    st.set_page_config(page_title="RAG with Cohere Reranking", layout="wide")
+    st.title("RAG System with Cohere Reranking")
+
+    # Initialize paths
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    data_directory = os.path.join(current_dir, "data")
+    persist_directory = os.path.join(current_dir, "chromadb")
+
+    # Create directories
+    os.makedirs(data_directory, exist_ok=True)
+    os.makedirs(persist_directory, exist_ok=True)
+
+    # Initialize RAG system
+    if "rag_system" not in st.session_state:
+        with st.spinner("Initializing system..."):
+            rag_system = RAGSystem(persist_directory)
+            st.session_state.rag_system = rag_system
+
+    # Query interface
+    st.header("Query Interface")
+    query = st.text_input("Enter your question:")
+    top_k = st.slider("Number of documents to retrieve", 1, 10, 3)
+
+    if st.button("Search", type="primary"):
+        if query:
+            with st.spinner("Searching and reranking..."):
+                result = st.session_state.rag_system.query(query, top_k)
+                display_results(result)
+
+
+if __name__ == "__main__":
+    main()
