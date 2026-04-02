@@ -197,3 +197,93 @@ print(f"Estimated training cost for {TRAINING_MODEL}: ${cost:.6f} USD")
 # state = client.fine_tuning.jobs.retrieve(response.id) #ftjob-0w4vss9dD82XinmEKTpGxrab
 state = client.fine_tuning.jobs.retrieve("ftjob-0w4vss9dD82XinmEKTpGxrab")
 pprint.pprint(f"Fine-tuning job is running{state}")
+
+
+result_file = 'file-FC8B7fcwXXy5gKyHnzuQ4b' # this is from the result of running 'state' variable
+# fine_tuned_model='ft:gpt-4o-mini-2024-07-18:personal::DQHDS2pA'
+file_data = client.files.content(result_file)
+
+# its binary, so we have to read it and then make it a file like object
+file_data_bytes = file_data.read()
+file_like_object = io.BytesIO(file_data_bytes)
+
+# read as csv to create df
+df = pd.read_csv(file_like_object)
+# print(df) # Sometimes we might get gibberish?
+
+## Testing and evaluating -- first use the main model and prompt it:
+## make sure to change the messages to match the data set we fine-tuned our model with
+
+# response = client.chat.completions.create(
+#     model = "gpt-4o-mini",
+#     messages=[
+#         {
+#             "role": "system",
+#             "content": "This is a customer support chatbot designed to help with common inquiries.",
+#             "role": "user",
+#             "content": "What types of teas are included in the subscription?",
+#         }
+#     ]
+# )
+# print(response.choices[0].message.content) # It should give a hallucination or IDK... since it is not the fine tuned model
+# print("\n ========")
+fine_tuned_model='ft:gpt-4o-mini-2024-07-18:personal::DQHDS2pA'
+response = client.chat.completions.create(
+    model = fine_tuned_model,
+    messages=[
+        {
+            "role": "system",
+            "content": "This is a customer support chatbot designed to help with common inquiries.",
+            "role": "user",
+            "content": "How do I change my tea preferences for the next shipment?", 
+            # "content": "What types of teas are included in the subscription?",
+        }
+    ]
+)
+print(
+    f" ==== >> Fined-tuned model response: \n {response.choices[0].message.content}"
+)  # we should get a coherent answer since we are now using a fine-tuned model!!!
+
+
+context = [
+    {
+        "role": "system",
+        "content": """This is a customer support chatbot designed to help with common 
+                                           inquiries for TeaCrafters""",
+    }
+]
+
+
+def collect_messages(
+    role, message
+):  # keeps track of the message exchange between user and assistant
+    context.append({"role": role, "content": f"{message}"})
+
+
+def get_completion():
+    try:
+        response = client.chat.completions.create(
+            model=fine_tuned_model, messages=context
+        )
+
+        print("\n Assistant: ", response.choices[0].message.content, "\n")
+        return response.choices[0].message.content
+    except openai.APIError as e:
+        print(e.http_status)
+        print(e.error)
+        return e.error
+
+
+# Start the conversation between the user and the AI assistant/chatbot
+while True:
+    collect_messages(
+        "assistant", get_completion()
+    )  # stores the response from the AI assistant
+
+    user_prompt = input("User: ")  # input box for entering prompt
+
+    if user_prompt == "exit":  # end the conversation with the AI assistant
+        print("\n Goodbye")
+        break
+
+    collect_messages("user", user_prompt)  # stores the user prompt
