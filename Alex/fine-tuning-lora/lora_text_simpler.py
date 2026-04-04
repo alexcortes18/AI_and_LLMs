@@ -135,3 +135,19 @@ if __name__ == "__main__":
         cfg["train_data"].set_format("torch") 
         cfg["test_data"].set_format("torch")
         
+        training_arguments = TrainingArguments(
+            output_dir="./checkpoints",
+            learning_rate=2e-4,
+            per_device_eval_batch_size=16,
+            per_device_train_batch_size=16,
+            num_train_epochs=5,
+            weight_decay=0.01,
+            evaluation_strategy="epoch",
+            save_strategy="epoch",
+            load_best_model_at_end=True,
+            metric_for_best_model="accuracy",
+            greater_is_better=True,
+            logging_steps=10,
+            warmup_steps=10,
+            seed=42
+        )
