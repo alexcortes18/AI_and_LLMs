@@ -154,7 +154,105 @@ if __name__ == "__main__":
     
     metric = evaluate.load("accuracy")
     
-    def compute_metrics(eval_pred):
+    def compute_metrics(eval_pred): # This function is the one we give the Trainer object.
         predictions, labels = eval_pred
         predictions = np.argmax(predictions, axis=1)
         return metric.compute(predictions=predictions, references=labels)
+    
+    for name, cfg in config.items():
+        print(f"\nTraining {name} classifier...")
+        
+        model = build_lora_model(cfg["num_labels"])
+        
+        trainer = Trainer(
+            model = model,
+            args = training_arguments,
+            train_dataset= cfg["train_data"],
+            eval_dataset= cfg["test_data"],
+            data_collator= data_collator,
+            compute_metrics=compute_metrics
+        )
+        
+        trainer.train()
+        eval_results = trainer.evaluate()
+        print(f"Evaluation accuracy: {eval_results['eval_accuracy']:.4f}")
+        
+        trainer.save_model(cfg["path"])
+        print_model_size(cfg["path"])
+# Building the model finished.        
+##############################################################################        
+        
+        
+    # Prediction function: For inference. We reload the model we already built
+    def predict_text(text, model_path, num_labels, task_type):
+        base_model = AutoModelForSequenceClassification.from_pretrained(
+            model_checkpoint, num_labels = num_labels
+        )
+        model = PeftModel.from_pretrained(base_model, model_path) #Reloads saved LoRA setup
+        model.eval() #puts the model in evaluation mode -> to use the model for inference/testing only
+        
+        inputs = tokenizer(
+            text.lower().strip(), return_tensors="pt", truncation = True, max_length = 128
+        )
+        
+        with torch.no_grad():
+            outputs = model(**inputs)
+            probabilities = torch.nn.functional.softmax(outputs.logits,dim=-1)
+            predicted_class = torch.argmax(probabilities, dim=1).item()
+            confidence = probabilities[0][predicted_class].item()
+        
+        if task_type=="sentiment":
+            label_map = {0:"Negative", 1:"Positive"}
+        else:
+            label_map={
+                0:"World",
+                1:"Sports",
+                2:"Business",
+                3:"Science/Technology"
+            }
+        return label_map[predicted_class], confidence
+    
+    # Test examples
+    test_texts = [
+        {
+            "text": "This movie was absolutely fantastic! The acting was superb.",
+            "model": "sentiment",
+            "num_labels": 2,
+            "task_type": "sentiment",
+            "expected": "Positive",
+        },
+        {
+            "text": "The worst film I've ever seen. Complete waste of time.",
+            "model": "sentiment",
+            "num_labels": 2,
+            "task_type": "sentiment",
+            "expected": "Negative",
+        },
+        {
+            "text": "Tesla stock surges 20% after strong quarterly earnings report.",
+            "model": "topic",
+            "num_labels": 4,
+            "task_type": "topic",
+            "expected": "Business",
+        },
+        {
+            "text": "New AI model achieves breakthrough in protein folding.",
+            "model": "topic",
+            "num_labels": 4,
+            "task_type": "topic",
+            "expected": "Science/Technology",
+        },
+    ]
+    
+    print("\nRunning predictions on test examples:")
+    for test in test_texts:
+        prediction, confidence = predict_text(
+            test["text"],
+            config[test["model"]]["path"],
+            test["num_labels"],
+            test["task_type"],
+        )
+        print(f"\nText: {test['text']}")
+        print(f"Expected: {test['expected']}")
+        print(f"Predicted: {prediction}")
+        print(f"Confidence: {confidence:.2%}")
