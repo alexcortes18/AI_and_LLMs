@@ -103,14 +103,14 @@ if __name__ == "__main__":
             "test_data": dataset1_test,
             "num_labels": 2,
             "epochs": 5,
-            "path": "./lora-sentiment"
+            "path": "./fine-tuning-lora/lora-sentiment"
         },
         "topic":{
             "train_data": dataset2_train,
             "test_data": dataset2_test,
             "num_labels": 4,
             "epochs": 5,
-            "path": "./lora-topic",
+            "path": "./fine-tuning-lora/lora-topic",
         },
     }
     
@@ -136,13 +136,13 @@ if __name__ == "__main__":
         cfg["test_data"].set_format("torch")
         
     training_arguments = TrainingArguments(
-        output_dir="./checkpoints",
+        output_dir="./fine-tuning-lora/checkpoints",
         learning_rate=2e-4,
         per_device_eval_batch_size=16,
         per_device_train_batch_size=16,
         num_train_epochs=5,
         weight_decay=0.01,
-        evaluation_strategy="epoch",
+        eval_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
         metric_for_best_model="accuracy",

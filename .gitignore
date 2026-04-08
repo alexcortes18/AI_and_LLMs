@@ -186,3 +186,9 @@ cython_debug/
 .DS_Store
 .DS_Store
 /TUTORIALS_ai-llm-engineer-course
+
+# LoRA training artifacts
+/Alex/fine-tuning-lora/checkpoints/
+/Alex/fine-tuning-lora/lora-sentiment/
+/Alex/fine-tuning-lora/lora-topic/
+/fine-tuning-lora/
