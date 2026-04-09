@@ -109,7 +109,7 @@ class ModelService:
             
             return {
                 "results": results,
-                "total_time": total_time
+                "total_processing_time": total_time
             }
         except Exception as e:
             print("Error!!!")
@@ -139,13 +139,13 @@ async def root():
         }
     }
 
-@app.get("/predict", response_model = SentimentResponse)
+@app.post("/predict", response_model = SentimentResponse)
 async def predict_sentiment(request: ReviewRequest):
     """Predict the sentiment for a single movie review"""
     result = await model_service.predict_sentiment(request.text)
     return result
 
-@app.get("/predict_batch", response_model=BatchSentimentResponse)
+@app.post("/predict_batch", response_model=BatchSentimentResponse)
 async def predict_batch_sentiment(request: BatchReviewRequest):
     """Predict sentiment for multiple movie reviews"""
     results = await model_service.predict_batch_sentiment(request.texts)
