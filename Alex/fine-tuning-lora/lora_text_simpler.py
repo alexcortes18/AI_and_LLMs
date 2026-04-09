@@ -103,14 +103,14 @@ if __name__ == "__main__":
             "test_data": dataset1_test,
             "num_labels": 2,
             "epochs": 5,
-            "path": "./fine-tuning-lora/lora-sentiment"
+            "path": "./Alex/fine-tuning-lora/lora-sentiment"
         },
         "topic":{
             "train_data": dataset2_train,
             "test_data": dataset2_test,
             "num_labels": 4,
             "epochs": 5,
-            "path": "./fine-tuning-lora/lora-topic",
+            "path": "./Alex/fine-tuning-lora/lora-topic",
         },
     }
     

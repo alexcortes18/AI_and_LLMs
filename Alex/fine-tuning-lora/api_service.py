@@ -27,12 +27,12 @@ class BatchSentimentResponse(BaseModel):
     
 class ModelService:
     def __init__(self):
-         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-         self.model_checkpoint = "distilbert-base-uncased"
-         self.model_path = "./fine-tuning-lora/lora-sentiment"
-         self.tokenizer = None #weishenme?
-         self.model = None
-         self.load_model()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model_checkpoint = "distilbert-base-uncased"
+        self.model_path = "./Alex/fine-tuning-lora/lora-sentiment"
+        self.tokenizer = None
+        self.model = None
+        self.load_model()
          
     def load_model(self):
         """Load the tokenizer and the model"""
@@ -115,4 +115,50 @@ class ModelService:
             print("Error!!!")
             raise HTTPException(status_code=500, detail=str(e))
 
+# Initialize the Model Service
+model_service = ModelService()
+
 # Initialize FastAPI app
+app = FastAPI(
+    title="Movie Review Sentiment Analysis API",
+    description="API for analyzing sentiment in movie reviews",
+    version="1.0.0"
+)
+
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    # FastAPI turns the Python Dictionary into a JSON for the HTTP response.
+    return{
+        "message": "Movie Review Sentiment Analysis API",
+        "status": "active",
+        "endpoints":{
+            "/predict": "Predict Sentiment for a single review",
+            "/predict_batch": "Predict sentiment for multiple reviews",
+            "/health": "Check API health status"
+        }
+    }
+
+@app.get("/predict", response_model = SentimentResponse)
+async def predict_sentiment(request: ReviewRequest):
+    """Predict the sentiment for a single movie review"""
+    result = await model_service.predict_sentiment(request.text)
+    return result
+
+@app.get("/predict_batch", response_model=BatchSentimentResponse)
+async def predict_batch_sentiment(request: BatchReviewRequest):
+    """Predict sentiment for multiple movie reviews"""
+    results = await model_service.predict_batch_sentiment(request.texts)
+    return results
+
+@app.get("/health")
+async def health_check():
+    """Check the health status of the API"""
+    return{
+        "status":"healthy",
+        "model_loaded": model_service.model is not None,
+        "device": str(model_service.device)
+    }
+
+if __name__ == "__main__":
+    uvicorn.run("api_service:app", host= "0.0.0.0", port=8000, reload=True)
