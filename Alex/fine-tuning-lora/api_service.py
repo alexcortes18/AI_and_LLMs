@@ -55,7 +55,7 @@ class ModelService:
             print(f"Error loading model: {str(e)}")
             raise RuntimeError(f"Failed to load model: {str(e)}")
     
-    async def predict_setiment(self, text: str) -> Dict:
+    async def predict_sentiment(self, text: str) -> Dict:
         """Predict sentiment for a single text."""
         try:
             import time
@@ -82,7 +82,7 @@ class ModelService:
                 confidence = probs[0][prediction].item()
                 
             # Ma prediction to sentiment
-            sentiment = "Postive" if prediction == 1 else "Negative"
+            sentiment = "Positive" if prediction == 1 else "Negative"
             processing_time = time.time() - start_time
             
             return{
@@ -93,3 +93,26 @@ class ModelService:
             }
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+        
+    async def predict_batch_sentiment(self, texts: List[str]) -> Dict:
+        """Predict sentiment for a batch of texts"""
+        try:
+            import time
+            start_time = time.time()
+            
+            results = []
+            for text in texts:
+                result = await self.predict_sentiment(text)
+                results.append(result)
+                
+            total_time = time.time() - start_time
+            
+            return {
+                "results": results,
+                "total_time": total_time
+            }
+        except Exception as e:
+            print("Error!!!")
+            raise HTTPException(status_code=500, detail=str(e))
+
+# Initialize FastAPI app
