@@ -192,3 +192,4 @@ cython_debug/
 /Alex/fine-tuning-lora/lora-sentiment/
 /Alex/fine-tuning-lora/lora-topic/
 /fine-tuning-lora/
+Alex/Multimodal RAG/dataset/flowers-102-categories/*
