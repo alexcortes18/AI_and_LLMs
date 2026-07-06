@@ -53,7 +53,7 @@ from chromadb.utils.embedding_functions import OpenCLIPEmbeddingFunction
 from chromadb.utils.data_loaders import ImageLoader
 
 # create the chroma client, image loader, embedding function
-chroma_client = chromadb.PersistentClient(path="./data/.chromadb")
+chroma_client = chromadb.PersistentClient(path="./data/flower.db")
 image_loader = ImageLoader()
 embedding_function = OpenCLIPEmbeddingFunction()
 
